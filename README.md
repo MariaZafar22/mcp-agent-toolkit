@@ -1,28 +1,39 @@
-# MCP-Powered AI Agent (Day 17)
+# MCP Agent Toolkit
 
-A small project that shows how **Model Context Protocol (MCP)** lets an AI agent discover and use tools.
+A lightweight Python project that demonstrates how the **Model Context Protocol (MCP)** lets an AI agent discover, select, and use external tools.
 
-- `server.py` - an MCP server with 6 custom tools
-- `agent.py` - an AI agent (MCP client) that connects to the server, lets Claude choose tools, and returns a final answer
+**What's inside**
 
-## 1. What is MCP?
+- **`server.py`**: an MCP server that exposes 6 custom tools
+- **`agent.py`**: an AI agent (MCP client) that connects to the server, lets Claude choose the right tools, and returns a final answer
 
-MCP (Model Context Protocol) is an open standard that defines **how AI applications connect to external tools and data**. Instead of writing custom glue code for every tool and every AI app, a tool is written once as an *MCP server*, and any *MCP client* can use it.
+---
 
-**Why it is useful for agents:** tools are discovered at runtime (`list_tools`), have clear JSON-schema inputs, can be reused across apps, and can be updated on the server without changing the agent.
+## What is MCP?
 
-### Function calling vs MCP
+The **Model Context Protocol (MCP)** is an open standard that defines how AI applications connect to external tools and data. A tool is written once as an **MCP server**, and any **MCP client** can use it. There is no custom integration code for each application.
 
-| | Function calling | MCP |
+**Why it matters for AI agents**
+
+- **Runtime discovery:** the agent asks the server which tools exist (`tools/list`).
+- **Clear contracts:** every tool has a JSON-schema description of its inputs.
+- **Reusable:** one server works with many clients.
+- **Easy to update:** tools can change on the server without touching the agent.
+
+### Function calling vs. MCP
+
+| | **Function calling** | **MCP** |
 |---|---|---|
-| What it is | A model feature: the model returns "call function X with args Y" | A protocol: a standard way to expose and connect tools/data |
-| Where tools live | Defined inside your app code | In a separate server process, reusable by any client |
-| Discovery | You hard-code the tool list | Client asks the server (`tools/list`) |
-| Reuse | Per app | Write once, use in many apps |
+| **What it is** | A model feature: the model replies "call function X with arguments Y" | A protocol: a standard way to expose and connect tools and data |
+| **Where tools live** | Inside your application code | In a separate server process |
+| **Discovery** | Tool list is hard-coded | Client asks the server at runtime |
+| **Reuse** | One application | Write once, use everywhere |
 
-They work together: the agent gets tool definitions from MCP, the model uses function calling to pick one, and the agent runs it through MCP.
+The two work together: the agent receives tool definitions through **MCP**, the model picks a tool using **function calling**, and the agent executes it back through **MCP**.
 
-## 2. Architecture
+---
+
+## Architecture
 
 ```
  User
@@ -41,97 +52,126 @@ They work together: the agent gets tool definitions from MCP, the model uses fun
 +------------------+
 ```
 
-Agent loop: **request -> LLM picks tool -> agent calls tool via MCP -> result back to LLM -> repeat -> final answer** (max 8 steps).
+**Agent loop:** request, then the LLM picks a tool, the agent calls it through MCP, the result goes back to the LLM, and the cycle repeats until a final answer is ready (maximum 8 steps).
 
-## 3. Tools
+---
 
-| Tool | Input | Output | Type |
+## Available Tools
+
+| **Tool** | **Input** | **Output** | **Type** |
 |---|---|---|---|
-| `calculator` | `expression: str` | `"25 * 48 = 1200"` | read-only |
-| `get_current_time` | `timezone: str` (default `Asia/Karachi`) | formatted date/time | read-only |
-| `word_count` | `text: str` | words, characters, sentences | read-only |
-| `save_note` | `title: str`, `content: str` | confirmation | **writes a file** |
-| `list_notes` | none | list of note titles | read-only |
-| `read_note` | `title: str` | note content | read-only |
+| `calculator` | `expression: str` | `"25 * 48 = 1200"` | Read-only |
+| `get_current_time` | `timezone: str` (default `Asia/Karachi`) | Formatted date and time | Read-only |
+| `word_count` | `text: str` | Words, characters, sentences | Read-only |
+| `save_note` | `title: str`, `content: str` | Confirmation message | **Writes a file** |
+| `list_notes` | none | List of saved note titles | Read-only |
+| `read_note` | `title: str` | Note content | Read-only |
 
-## 4. Setup
+---
 
-Requires Python 3.10+.
+## Getting Started
+
+**Requirements:** Python 3.10 or higher.
 
 ```bash
 python -m venv venv
-# Windows:  venv\Scripts\activate
-# Mac/Linux: source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+# macOS / Linux
+source venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
-## 5. Run
+---
 
-**Start / check the server** (it waits silently for a client - that is normal; press Ctrl+C to stop):
+## Usage
+
+**1. Start the server**
 
 ```bash
 python server.py
 ```
 
-**Inspect the tools visually** (optional, needs Node.js):
+The server waits silently for a client. This is expected. Press `Ctrl + C` to stop it.
+
+**2. Inspect the tools visually** (optional, requires Node.js)
 
 ```bash
 npx @modelcontextprotocol/inspector python server.py
 ```
 
-**Run the agent with a real LLM (Claude):**
+**3. Run the agent with Claude**
 
 ```bash
-# Windows PowerShell:  $env:ANTHROPIC_API_KEY="sk-ant-..."
-# Mac/Linux:           export ANTHROPIC_API_KEY="sk-ant-..."
+# Windows PowerShell
+$env:ANTHROPIC_API_KEY="sk-ant-..."
+# macOS / Linux
+export ANTHROPIC_API_KEY="sk-ant-..."
 
 python agent.py "What is 25 * 48 + 10?"
 python agent.py "Calculate 25 * 48, get the time in Asia/Karachi, and save both results in a note called day17"
-python agent.py                      # interactive chat mode
+python agent.py            # interactive chat mode
 ```
 
-**Run without any API key** (offline demo, a simple rule-based planner plays the role of the LLM):
+**4. Run without an API key** (offline demo mode)
+
+A simple rule-based planner takes the role of the LLM, so the full tool workflow still works.
 
 ```bash
 python agent.py --demo "Calculate 25 * 48, get the time in Asia/Karachi, and save everything in a note called day17"
 ```
 
-Add `--auto-approve` to skip the permission question before `save_note`.
+Add `--auto-approve` to skip the permission prompt before `save_note`.
 
-## 6. Error handling
+---
 
-- Tools raise `ToolError` with a clear message (division by zero, unknown timezone, missing note, bad title). The server marks the result as an error.
-- The agent passes `is_error: true` back to the LLM so it can explain the problem or retry with corrected input.
-- API/network errors are caught and shown as `Agent error: ...` instead of crashing.
+## Example Multi-Step Workflow
 
-## 7. Permissions and safety
+**Request:** *"Calculate 25 * 48, get the time in Asia/Karachi, and save everything in a note called day17"*
 
-- **Human approval:** `save_note` is a write tool, so the agent asks `y/n` before running it (skip with `--auto-approve`).
-- **Sandbox:** notes can only be written inside the `notes/` folder; titles are sanitised so `../../etc/passwd` becomes `etcpasswd.txt` (no path traversal).
-- **No `eval`:** the calculator parses the expression with `ast` and only allows numbers and math operators.
-- **Limits:** max 5000 characters per note, max exponent 100, max 8 agent steps.
-- **Least privilege:** the server exposes only these six tools - no shell, no arbitrary file access.
-- **Secrets:** the API key comes from an environment variable and is never stored in the repo.
+1. `calculator("25 * 48")` returns `1200`
+2. `get_current_time("Asia/Karachi")` returns the current date and time
+3. `save_note("day17", "25 * 48 = 1200 | <time>")` saves the note
+4. The agent replies with a short summary of all three results
 
-## 8. Example multi-step workflow
+**Follow-up:** *"read the note called day17"* calls `read_note` and returns the saved content.
 
-Request: *"Calculate 25 * 48, get the time in Asia/Karachi, and save everything in a note called day17"*
+---
 
-1. `calculator("25 * 48")` -> `1200`
-2. `get_current_time("Asia/Karachi")` -> current date/time
-3. `save_note("day17", "25 * 48 = 1200 | <time>")` -> saved
-4. Final answer summarising all three results
+## Error Handling
 
-Then: *"read the note called day17"* -> `read_note` returns the saved content.
+- Tools raise a `ToolError` with a clear message (division by zero, unknown timezone, missing note, invalid title).
+- The agent passes `is_error: true` back to the LLM, so it can explain the problem or retry with corrected input.
+- API and network failures are caught and shown as `Agent error: ...` instead of crashing the program.
 
-## 9. Project structure
+---
+
+## Permissions and Safety
+
+- **Human approval:** `save_note` writes to disk, so the agent asks for `y/n` confirmation first (skip with `--auto-approve`).
+- **Sandboxed storage:** notes are written only inside the `notes/` folder. Titles are sanitized, so `../../etc/passwd` becomes `etcpasswd.txt`.
+- **No `eval`:** the calculator parses expressions with `ast` and allows only numbers and math operators.
+- **Hard limits:** 5,000 characters per note, exponent up to 100, and at most 8 agent steps.
+- **Least privilege:** only six tools are exposed. There is no shell access and no arbitrary file access.
+- **Secrets:** the API key is read from an environment variable and is never stored in the repository.
+
+---
+
+## Project Structure
 
 ```
-mcp-agent-project/
-  server.py          MCP server (tools)
-  agent.py           MCP client + AI agent loop
-  requirements.txt
-  notes/             where save_note stores files
+mcp-agent-toolkit/
+  server.py          MCP server and tools
+  agent.py           MCP client and agent loop
+  requirements.txt   Python dependencies
+  notes/             Storage for saved notes
   README.md
 ```
+
+---
+
+## Conclusion
+
+This project shows the complete MCP workflow in a small, readable codebase: a server that publishes tools, an agent that discovers them, and an LLM that decides which ones to call and in what order. It is a solid starting point for building larger agents. Add more tools to `server.py`, connect other MCP servers, or swap in a different model, and the same architecture keeps working.
